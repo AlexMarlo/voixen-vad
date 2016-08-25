@@ -6,7 +6,7 @@
 #include "simplevad.h"
 
 /* calculate the number of samples for an audio frame */
-#define CALC_FRAME_SIZE(duration, rate) (((rate) / 1000) * (duration))
+#define CALC_FRAME_SIZE(duration, rate) (((rate) / 1000) * duration)
 /* max. supported sample rate in Hz */
 #define MAX_SAMPLERATE                  48000
 /* max. supported frame length in ms */
@@ -46,13 +46,13 @@ struct _vadstate_t
 typedef struct _vad_sample_iterator
 {
     short*         buf;    /* frame buffer */
-    const float*   ptr;    /* input samples */
+    const int16_t* ptr;    /* input samples */
     size_t         ofs;    /* offset into frame buffer */
     size_t         len;    /* number of input samples */
     size_t         inc;    /* frame increment in samples */
 } vad_sample_iterator;
 
-static void vadFrameBegin(vad_sample_iterator* it, vad_t state, const float* samples, size_t num_samples);
+static void vadFrameBegin(vad_sample_iterator* it, vad_t state, const int16_t* samples, size_t num_samples);
 static int  vadFrameNext(vad_sample_iterator* it);
 static void vadFrameEnd(vad_t state, vad_sample_iterator* it);
 static vad_event vadDecision(const int* histogram);
@@ -130,27 +130,21 @@ int vadSetMode(vad_t state, vad_mode mode)
     return result;
 }
 
-vad_event vadProcessAudio(vad_t state, int samplerate, const float* samples, size_t num_samples)
+vad_event vadProcessAudio(vad_t state, int samplerate, const int16_t* frame, size_t frame_length)
 {
-    int                 histogram[EVENT_COUNT];
-    vad_sample_iterator it;
-
+	static int count = 0;
     if (!state->sample_rate && vadInitState(state, samplerate)) { return VAD_EVENT_ERROR; }
     else if (state->sample_rate != samplerate) { return VAD_EVENT_ERROR; } /* variable sample rate is not supported */
 
-    memset(histogram, 0, sizeof histogram);
+    int event = WebRtcVad_Process(state->vad, samplerate, frame, frame_length);
 
-    vadFrameBegin(&it, state, samples, num_samples);
-    while (!vadFrameNext(&it)) {
-        int event = WebRtcVad_Process(state->vad, samplerate, it.buf, it.inc);
-#if defined(VAD_DEBUG)
-        printf("[native] vadProcessAudio event=%s\n", NAME(event+1));
-#endif
-        ++histogram[EVENT_OFFSET(event)];
-    }
-    vadFrameEnd(state, &it);
+    if( event == 1)
+    	return VAD_EVENT_VOICE;
+    else
+    	if( event == 0)
+    		return VAD_EVENT_SILENCE;
 
-    return vadDecision(histogram);
+    return VAD_EVENT_ERROR;
 }
 
 static int vadInitState(vad_t state, int rate)
@@ -161,7 +155,7 @@ static int vadInitState(vad_t state, int rate)
     return !(rate == 8000 || rate == 16000 || rate == 32000 || rate == 48000);
 }
 
-static void vadFrameBegin(vad_sample_iterator* it, vad_t state, const float* samples, size_t num_samples)
+static void vadFrameBegin(vad_sample_iterator* it, vad_t state, const int16_t* samples, size_t num_samples)
 {
     it->buf = state->frame;
     it->inc = state->frame_length;
@@ -184,8 +178,7 @@ static int vadFrameNext(vad_sample_iterator* it)
 
     for (i = 0, fill = it->inc - it->ofs; i < fill && it->len > 0; ++i, --it->len)
     {
-        int sample = *it->ptr++ * 32768;
-        it->buf[it->ofs++] = CLIP(sample);
+        it->buf[it->ofs++] = *it->ptr++;
     }
 
     return it->ofs < it->inc;

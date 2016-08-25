@@ -70,7 +70,7 @@ int      vadSetMode(vad_t state, vad_mode mode);
  * @remarks
  * The result is the integral of all detected sub-events for the given samples
  */
-vad_event  vadProcessAudio(vad_t state, int samplerate, const float* samples, size_t num_samples);
+vad_event  vadProcessAudio(vad_t state, int samplerate, const int16_t* frame, size_t frame_length);
 
 #ifdef __cplusplus
 }

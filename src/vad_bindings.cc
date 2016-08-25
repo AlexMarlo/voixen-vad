@@ -39,7 +39,7 @@ namespace
 class VADWorker : public AsyncWorker
 {
 public:
-    VADWorker(Callback* callback, vad_t vad, size_t rate, const float* samples, size_t length)
+    VADWorker(Callback* callback, vad_t vad, size_t rate, const int16_t* samples, size_t length)
         : AsyncWorker(callback), vad(vad), rate(rate), samples(samples), length(length),
           result(VAD_EVENT_SILENCE) {}
 
@@ -48,7 +48,7 @@ public:
     /**
      *    Performs work in a separate thread.
      */
-    void Execute() { result = vadProcessAudio(vad, rate, samples, length / sizeof(float)); }
+    void Execute() { result = vadProcessAudio(vad, rate, samples, length/sizeof(int16_t)); }
 
     /**
        *    Convert the output and pass it back to js
@@ -61,11 +61,11 @@ public:
     }
 
 private:
-    vad_t        vad;
-    size_t       rate;
-    const float* samples;
-    size_t       length;
-    vad_event    result;
+    vad_t          vad;
+    size_t         rate;
+    const int16_t* samples;
+    size_t         length;
+    vad_event      result;
 };
 
 }
@@ -186,8 +186,8 @@ NAN_METHOD(vadProcessAudioBuffer_)
     // #0 buffer #1 buffer #2 integer #3 callback
     vad_t vad = node::Buffer::HasInstance(info[0]) ?
                 reinterpret_cast<vad_t>(node::Buffer::Data(info[0])) : NULL;
-    const float* samples = node::Buffer::HasInstance(info[1]) ?
-                reinterpret_cast<const float*>(node::Buffer::Data(info[1])) : NULL;
+    const int16_t* samples = node::Buffer::HasInstance(info[1]) ?
+                reinterpret_cast<const int16_t*>(node::Buffer::Data(info[1])) : NULL;
 
     if (!vad || !samples)
     {
